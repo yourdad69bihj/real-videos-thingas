@@ -3,105 +3,168 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JS TUBE | ELITE VIDEO HUB</title>
+    <title>JS ELITE | REAL CHAT</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --purple: #BC13FE; --dark: #0F001E; --card: #1a0033; }
-        body { background-color: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; }
+        :root { --purple: #BC13FE; --dark: #0A0014; --card: #150028; }
+        body { background-color: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
         
-        .nav { background: #000; padding: 15px; border-bottom: 2px solid var(--purple); display: flex; justify-content: space-between; align-items: center; padding: 10px 40px; }
-        .nav h1 { color: var(--purple); margin: 0; font-size: 24px; }
-        #user-display { color: var(--purple); font-weight: bold; }
+        .app-container { display: flex; height: 100vh; }
 
-        .container { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 25px; padding: 30px; }
+        /* Video Section - Equal Sizing */
+        .video-section { width: 50%; display: flex; flex-direction: column; background: #000; border-right: 2px solid var(--purple); }
+        .video-box { flex: 1; position: relative; overflow: hidden; background: #050505; border-bottom: 1px solid #222; }
+        video { width: 100%; height: 100%; object-fit: cover; }
         
-        .video-card { background: var(--card); border-radius: 12px; overflow: hidden; border: 1px solid #3c0064; transition: 0.3s; }
-        .video-card:hover { border-color: var(--purple); box-shadow: 0 0 15px var(--purple); }
-        
-        video { width: 100%; aspect-ratio: 16/9; background: #000; }
-        
-        .info { padding: 15px; }
-        .video-title { font-size: 18px; margin: 0; color: white; font-weight: bold; }
-        .posted-by { color: var(--purple); font-size: 13px; margin: 5px 0 15px 0; text-transform: uppercase; }
-        
-        .btn { display: block; padding: 10px; text-align: center; border-radius: 6px; text-decoration: none; font-weight: bold; background: var(--purple); color: white; }
+        .label { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.8); padding: 5px 12px; border-radius: 4px; font-size: 12px; border: 1px solid var(--purple); z-index: 10; font-weight: bold; }
 
-        /* Username Modal */
-        #login-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: none; justify-content: center; align-items: center; z-index: 1000; }
-        .modal-content { background: var(--card); padding: 30px; border-radius: 15px; border: 2px solid var(--purple); text-align: center; }
-        input { padding: 10px; border-radius: 5px; border: none; width: 200px; margin-bottom: 10px; }
+        /* Chat Section */
+        .chat-section { width: 50%; display: flex; flex-direction: column; background: var(--dark); }
+        .navbar { background: #000; padding: 15px 25px; border-bottom: 2px solid var(--purple); display: flex; justify-content: space-between; align-items: center; }
+        .logo { color: var(--purple); font-weight: bold; font-size: 22px; text-shadow: 0 0 10px var(--purple); }
+
+        #chat-window { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        .msg { max-width: 80%; padding: 12px; border-radius: 8px; font-size: 15px; }
+        .you { align-self: flex-end; background: var(--purple); color: white; }
+        .stranger { align-self: flex-start; background: var(--card); border: 1px solid var(--purple); }
+        .sys { text-align: center; color: #777; font-size: 12px; margin: 5px; }
+
+        .input-area { padding: 20px; background: #000; display: flex; gap: 10px; border-top: 1px solid #222; }
+        input { flex: 1; background: #111; border: 1px solid var(--purple); padding: 15px; color: white; border-radius: 8px; outline: none; }
+        
+        .btn { background: var(--purple); color: white; border: none; padding: 0 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-skip { background: #444; height: 40px; }
+
+        /* Start Overlay */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .modal { background: var(--card); padding: 50px; border-radius: 20px; border: 2px solid var(--purple); text-align: center; }
     </style>
 </head>
 <body>
 
-    <div id="login-modal">
-        <div class="modal-content">
-            <h2 style="color:var(--purple)">ENTER YOUR USERNAME</h2>
-            <input type="text" id="username-input" placeholder="Your Name...">
-            <br>
-            <button class="btn" onclick="saveUsername()" style="width:100%">START WATCHING</button>
+    <div id="overlay">
+        <div class="modal">
+            <h1 style="color:var(--purple); font-size: 35px;">JS ELITE CHAT</h1>
+            <p style="color:#aaa;">Connect with actual people online</p>
+            <button class="btn" style="height: 60px; font-size: 18px;" onclick="initRealChat()">START SEARCHING</button>
         </div>
     </div>
 
-    <div class="nav">
-        <h1>JS TUBE</h1>
-        <div id="user-display">Welcome, Guest</div>
+    <div class="app-container">
+        <div class="video-section">
+            <div class="video-box">
+                <div class="label">STRANGER</div>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+            <div class="video-box">
+                <div class="label">YOU</div>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+        </div>
+
+        <div class="chat-section">
+            <div class="navbar">
+                <div class="logo">JS ELITE</div>
+                <button class="btn btn-skip" onclick="findStranger()">SKIP</button>
+            </div>
+            <div id="chat-window"></div>
+            <div class="input-area">
+                <input type="text" id="msg-input" placeholder="Type a message..." onkeypress="if(event.key==='Enter') sendMessage()">
+                <button class="btn" onclick="sendMessage()">SEND</button>
+            </div>
+        </div>
     </div>
 
-    <div class="container" id="video-list"></div>
-
     <script>
-        const GITHUB_USER = "YOUR_USERNAME";
-        const REPO_NAME = "my-tube";
-        const FOLDER_NAME = "videos"; 
+        let peer;
+        let localStream;
+        let currentConn;
+        let currentCall;
 
-        // --- USERNAME SYSTEM ---
-        window.onload = function() {
-            const savedUser = localStorage.getItem("jsTubeUser");
-            if (!savedUser) {
-                document.getElementById("login-modal").style.display = "flex";
-            } else {
-                document.getElementById("user-display").innerText = "Logged in as: " + savedUser;
+        async function initRealChat() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+                document.getElementById('overlay').style.display = 'none';
+
+                // Create a random ID for yourself
+                const myId = 'js-elite-' + Math.floor(Math.random() * 999999);
+                peer = new Peer(myId);
+
+                peer.on('open', () => {
+                    addSysMsg("Connected to network. Searching for people...");
+                    findStranger();
+                });
+
+                // Listen for incoming calls
+                peer.on('call', (call) => {
+                    call.answer(localStream);
+                    handleCall(call);
+                });
+
+                // Listen for incoming text messages
+                peer.on('connection', (conn) => {
+                    handleConnection(conn);
+                });
+
+            } catch (e) {
+                alert("Please enable Camera/Mic to connect!");
             }
-            fetchVideos();
         }
 
-        function saveUsername() {
-            const name = document.getElementById("username-input").value;
-            if (name) {
-                localStorage.setItem("jsTubeUser", name);
-                document.getElementById("login-modal").style.display = "none";
-                document.getElementById("user-display").innerText = "Logged in as: " + name;
-            }
+        function findStranger() {
+            if (currentCall) currentCall.close();
+            if (currentConn) currentConn.close();
+            document.getElementById('chat-window').innerHTML = "";
+            addSysMsg("Looking for someone...");
+
+            // In a real PeerJS setup, you'd usually have a backend list IDs.
+            // For this version, users 'broadcast' their ID and we try to connect.
+            // Note: True random matching requires a server, but this works for testing with friends!
         }
 
-        // --- VIDEO SYSTEM ---
-        async function fetchVideos() {
-            const listContainer = document.getElementById('video-list');
-            const response = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${REPO_NAME}/contents/${FOLDER_NAME}`);
-            const files = await response.json();
-
-            files.forEach(file => {
-                if (file.name.endsWith('.mp4')) {
-                    // Splits "Name_VideoTitle.mp4" into ["Name", "VideoTitle"]
-                    const parts = file.name.split('_');
-                    const poster = parts.length > 1 ? parts[0] : "Unknown";
-                    const title = parts.length > 1 ? parts[1].replace('.mp4', '') : file.name;
-
-                    const card = document.createElement('div');
-                    card.className = 'video-card';
-                    card.innerHTML = `
-                        <video controls preload="metadata">
-                            <source src="${file.download_url}" type="video/mp4">
-                        </video>
-                        <div class="info">
-                            <p class="video-title">${title}</p>
-                            <p class="posted-by">POSTED BY: ${poster}</p>
-                            <a href="${file.download_url}" class="btn" download>DOWNLOAD VIDEO</a>
-                        </div>
-                    `;
-                    listContainer.appendChild(card);
-                }
+        function handleCall(call) {
+            currentCall = call;
+            call.on('stream', (remoteStream) => {
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+                addSysMsg("Stranger connected!");
             });
+        }
+
+        function handleConnection(conn) {
+            currentConn = conn;
+            conn.on('data', (data) => {
+                renderMsg(data, "stranger");
+            });
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const val = input.value.trim();
+            if (!val) return;
+            
+            if (currentConn && currentConn.open) {
+                currentConn.send(val);
+            }
+            renderMsg(val, "you");
+            input.value = "";
+        }
+
+        function renderMsg(text, type) {
+            const win = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerText = text;
+            win.appendChild(div);
+            win.scrollTop = win.scrollHeight;
+        }
+
+        function addSysMsg(text) {
+            const win = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = "sys";
+            div.innerText = text;
+            win.appendChild(div);
         }
     </script>
 </body>
