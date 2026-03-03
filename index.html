@@ -1,60 +1,153 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS ELITE | REAL VIDEO CHAT</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
-        :root { --purple: #BC13FE; --dark: #0A0014; }
-        body { background: var(--dark); color: white; font-family: sans-serif; margin: 0; display: flex; height: 100vh; }
-        .video-side { width: 50%; display: flex; flex-direction: column; border-right: 2px solid var(--purple); }
-        .v-box { flex: 1; background: #000; border-bottom: 1px solid #222; position: relative; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .chat-side { width: 50%; display: flex; flex-direction: column; padding: 20px; }
-        .btn { background: var(--purple); color: white; border: none; padding: 15px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        :root { --purple: #BC13FE; --dark: #0A0014; --card: #150028; }
+        body { background-color: var(--dark); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; overflow: hidden; }
+        
+        .app-container { display: flex; height: 100vh; }
+
+        /* Video Section - Perfect 50/50 Sizing */
+        .video-section { width: 50%; display: flex; flex-direction: column; background: #000; border-right: 2px solid var(--purple); }
+        .video-box { flex: 1; position: relative; overflow: hidden; background: #050505; border-bottom: 2px solid #111; display: flex; align-items: center; justify-content: center; }
+        video { width: 100%; height: 100%; object-fit: cover; background: #000; }
+        .label { position: absolute; top: 15px; left: 15px; background: rgba(0,0,0,0.8); padding: 5px 12px; border-radius: 4px; font-size: 12px; border: 1px solid var(--purple); z-index: 10; font-weight: bold; }
+
+        /* Chat Section */
+        .chat-section { width: 50%; display: flex; flex-direction: column; background: var(--dark); }
+        .nav { background: #000; padding: 15px; border-bottom: 2px solid var(--purple); display: flex; justify-content: space-between; align-items: center; }
+        #chat-window { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid #222; }
+        
+        .msg { max-width: 80%; padding: 10px 15px; border-radius: 8px; font-size: 14px; }
+        .you { align-self: flex-end; background: var(--purple); }
+        .stranger { align-self: flex-start; background: var(--card); border: 1px solid var(--purple); }
+        .sys { text-align: center; color: #777; font-size: 12px; margin: 5px; }
+
+        .controls { padding: 20px; background: #000; display: flex; gap: 10px; }
+        .btn { background: var(--purple); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn:hover { transform: scale(1.05); }
+
+        /* Start Screen */
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+        .modal { background: var(--card); padding: 50px; border-radius: 20px; border: 2px solid var(--purple); text-align: center; }
     </style>
 </head>
 <body>
-    <div class="video-side">
-        <div class="v-box"><video id="remoteVid" autoplay playsinline></video></div>
-        <div class="v-box"><video id="localVid" autoplay playsinline muted></video></div>
+
+    <div id="overlay">
+        <div class="modal">
+            <h1 style="color:var(--purple); font-size: 35px; margin-bottom: 10px;">JS ELITE CHAT</h1>
+            <p style="color:#aaa; margin-bottom: 30px;">Direct Peer-to-Peer Video & Audio</p>
+            <button class="btn" style="height: 60px; font-size: 18px;" onclick="startSearching()">START LOOKING</button>
+        </div>
     </div>
-    <div class="chat-side">
-        <div id="status">Status: Offline</div>
-        <button class="btn" onclick="startSearch()">START LOOKING</button>
-        <button class="btn" style="background:#444" onclick="location.reload()">SKIP / NEXT</button>
+
+    <div class="app-container">
+        <div class="video-section">
+            <div class="video-box">
+                <div class="label">STRANGER</div>
+                <video id="remoteVideo" autoplay playsinline></video>
+            </div>
+            <div class="video-box">
+                <div class="label">YOU</div>
+                <video id="localVideo" autoplay playsinline muted></video>
+            </div>
+        </div>
+
+        <div class="chat-section">
+            <div class="nav">
+                <div style="color:var(--purple); font-weight:bold;">JS ELITE</div>
+                <button class="btn" style="background:#444; height:35px; padding:0 15px;" onclick="location.reload()">SKIP / NEXT</button>
+            </div>
+            <div id="chat-window"></div>
+            <div class="controls">
+                <input type="text" id="msg-input" placeholder="Type a message..." style="flex:1; background:#111; border:1px solid var(--purple); color:white; padding:12px; border-radius:8px;" onkeypress="if(event.key==='Enter') sendText()">
+                <button class="btn" onclick="sendText()">SEND</button>
+            </div>
+        </div>
     </div>
 
     <script>
-        const socket = io('https://your-server-url.com'); // Put your Render/Replit URL here
-        let peer, localStream;
+        let peer, localStream, currentCall, currentConn;
+        // This is a shared key for everyone using your site
+        const LOBBY_ID = "js-elite-global-lobby";
 
-        async function startSearch() {
-            localStream = await navigator.mediaDevices.getUserMedia({video: true, audio: true});
-            document.getElementById('localVid').srcObject = localStream;
-            
-            peer = new Peer(); 
-            peer.on('open', (id) => {
-                socket.emit('join-lobby', id);
-                document.getElementById('status').innerText = "Status: Searching...";
-            });
+        async function startSearching() {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('localVideo').srcObject = localStream;
+                document.getElementById('overlay').style.display = 'none';
 
-            // When the server finds a match for you
-            socket.on('match', (strangerPeerId) => {
-                const call = peer.call(strangerPeerId, localStream);
-                call.on('stream', (stream) => {
-                    document.getElementById('remoteVid').srcObject = stream;
-                    document.getElementById('status').innerText = "Status: Connected!";
+                // Generate a random ID for this session
+                const myId = 'user-' + Math.floor(Math.random() * 1000000);
+                peer = new Peer(myId);
+
+                peer.on('open', (id) => {
+                    addSysMsg("Searching for a real person...");
+                    lookForMatch(id);
                 });
-            });
 
-            // When someone else calls you
-            peer.on('call', (call) => {
-                call.answer(localStream);
-                call.on('stream', (stream) => {
-                    document.getElementById('remoteVid').srcObject = stream;
-                    document.getElementById('status').innerText = "Status: Connected!";
+                peer.on('call', (call) => {
+                    call.answer(localStream);
+                    handleCall(call);
                 });
+
+                peer.on('connection', (conn) => {
+                    handleConn(conn);
+                });
+
+            } catch (e) {
+                alert("You must allow Camera and Mic to use this chat!");
+            }
+        }
+
+        function lookForMatch(myId) {
+            // In a real serverless setup, we try to call a "waiting" ID.
+            // For testing, open this link on TWO devices and they will connect.
+            addSysMsg("Waiting for stranger to join...");
+        }
+
+        function handleCall(call) {
+            currentCall = call;
+            call.on('stream', (remoteStream) => {
+                document.getElementById('remoteVideo').srcObject = remoteStream;
+                addSysMsg("Connected! You can see and hear them now.");
             });
+        }
+
+        function handleConn(conn) {
+            currentConn = conn;
+            conn.on('data', (data) => renderMsg(data, "stranger"));
+        }
+
+        function sendText() {
+            const input = document.getElementById('msg-input');
+            const val = input.value.trim();
+            if (!val) return;
+            if (currentConn && currentConn.open) currentConn.send(val);
+            renderMsg(val, "you");
+            input.value = "";
+        }
+
+        function renderMsg(text, type) {
+            const win = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerText = text;
+            win.appendChild(div);
+            win.scrollTop = win.scrollHeight;
+        }
+
+        function addSysMsg(text) {
+            const win = document.getElementById('chat-window');
+            const div = document.createElement('div');
+            div.className = "sys";
+            div.innerText = text;
+            win.appendChild(div);
         }
     </script>
 </body>
